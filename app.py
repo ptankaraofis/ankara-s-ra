@@ -17,8 +17,8 @@ FILE_NAME = f"sira_listesi_{today_str}.csv"
 MESAJ_FILE = f"telsiz_mesajlari_{today_str}.csv"
 MAX_ICERI_KAPASITE = 3
 
-# --- MASAÜSTÜ KLASÖR AYARI ---
-DESKTOP_DIR = os.path.join(os.path.expanduser("~"), "Desktop", "Ofis_Sira_Raporlari")
+# --- CANLI SUNUCU UYUMLU KLASÖR AYARI ---
+DESKTOP_DIR = "Gunun_Raporlari"
 os.makedirs(DESKTOP_DIR, exist_ok=True)
 
 
@@ -77,6 +77,16 @@ def masaustune_excel_kaydet(df_guncel):
         excel_adi = f"Sira_Raporu_{today_str}_{suan_saat}.xlsx"
         dosya_tam_yolu = os.path.join(DESKTOP_DIR, excel_adi)
         df_guncel.to_excel(dosya_tam_yolu, index=False, sheet_name="Günün Listesi")
+        
+        # Ofis panelinden indirilebilmesi için Streamlit indirme butonu
+        with open(dosya_tam_yolu, "rb") as f:
+            st.download_button(
+                label="📥 Arşivlenmiş Excel Dosyasını İndir",
+                data=f,
+                file_name=excel_adi,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
         return dosya_tam_yolu
     except Exception as e:
         st.error(f"Excel arşivleme sırasında hata oluştu: {e}")
@@ -86,12 +96,11 @@ def masaustune_excel_kaydet(df_guncel):
 df = veri_yukle()
 
 # --- URL PARAMETRE KONTROLÜ (QR KOD ÖZELLEŞTİRMESİ) ---
-# Kuryeler QR kodu okuttuğunda link sonuna ?ekran=kurye eklerseniz sidebar gizlenir.
 query_params = st.query_params
 
 if "ekran" in query_params and query_params["ekran"] == "kurye":
     ekran_modu = "Kurye Giriş Ekranı"
-    # CSS ile kurye telefonunda sidebar'ı tamamen görünmez yapıyoruz
+    # Kurye telefonunda sidebar menüsünü tamamen gizleyen CSS
     st.markdown(
         """
         <style>
@@ -112,7 +121,7 @@ else:
 
 # --- 1. EKRAN: KURYE GİRİŞ EKRANI ---
 if ekran_modu == "Kurye Giriş Ekranı":
-    st.title("Box 📦 Ofis Giriş & Sıra Sistemi")
+    st.title("🛵 Pakettaxi Ofis Giriş Sıra Sistemi 🛵")
     st.write("Lütfen aşağıdaki bilgileri doldurarak sıra numaranızı alınız.")
 
     with st.container(border=True):
@@ -140,7 +149,7 @@ if ekran_modu == "Kurye Giriş Ekranı":
         kvkk_onay = st.checkbox("Yukarıdaki KVKK Aydınlatma Metni'ni okudum ve verilerimin işlenmesini onaylıyorum.")
 
         st.markdown("---")
-        submit = st.button("Sıra Numarası Al 🚀", use_container_width=True)  # Mobilde tam genişlik buton daha iyi
+        submit = st.button("Sıra Numarası Al 🚀", use_container_width=True)
 
         if submit:
             if not kvkk_onay:
@@ -185,7 +194,7 @@ if ekran_modu == "Kurye Giriş Ekranı":
                     st.success(f"✔️ Sıra Numaranız: {yeni_sira:03d}. Lütfen güvenlik alanında bekleyiniz.")
                     st.balloons()
 
-# --- GÜVENLİK VE OFİS PANELLERİ (ESKİ KODUN AYNI KISIMLARI) ---
+# --- 2. EKRAN: GÜVENLİK TRAFİK EKRANI ---
 elif ekran_modu == "Güvenlik Trafik Ekranı":
     st.title("🛡️ Kapı Güvenlik & Trafik Kontrol Paneli")
     g_sifre = st.text_input("Güvenlik Erişim Şifresi:", type="password", key="g_sifre_input")
@@ -197,7 +206,6 @@ elif ekran_modu == "Güvenlik Trafik Ekranı":
         st_autorefresh(interval=10000, key="guvenlik_yenileme")
 
         islemde_olanlar = df[df["Durum"] == "İşlemde"]
-        bekleyenler = df[df["Durum"] == "Bekliyor"]
         islemde_sayisi = len(islemde_olanlar)
 
         col_trafik, col_iletisim = st.columns([2, 1])
@@ -268,6 +276,7 @@ elif ekran_modu == "Güvenlik Trafik Ekranı":
         else:
             st.info("Şu anda sırada bekleyen veya işlemde olan aktif kurye bulunmuyor.")
 
+# --- 3. EKRAN: OFİS YÖNETİM PANELİ ---
 elif ekran_modu == "Ofis Yönetim Paneli":
     st.title("📊 Ofis Sıra Yönetim Paneli")
     sifre = st.text_input("Yönetici Şifresini Giriniz:", type="password", key="m_sifre_input")
@@ -327,8 +336,7 @@ elif ekran_modu == "Ofis Yönetim Paneli":
                 if not df.empty:
                     kaydedilen_yol = masaustune_excel_kaydet(df)
                     if kaydedilen_yol:
-                        st.success(f"📂 Rapor Masaüstündeki 'Ofis_Sira_Raporlari' klasörüne kaydedildi!")
-                        st.info(f"Dosya Adı: {os.path.basename(kaydedilen_yol)}")
+                        st.success(f"📂 Rapor arşivlendi! Aşağıdaki butondan indirebilirsiniz.")
                 else:
                     st.warning("⚠️ Bugün henüz hiç sıra alınmamış, raporlanacak veri yok.")
 
@@ -363,7 +371,7 @@ elif ekran_modu == "Ofis Yönetim Paneli":
                             ustlenen = st.selectbox(
                                 "İşlemi Üstlenen:",
                                 ["Eren", "Sabri", "Batuhan"],
-                                key=f"ust_{row['S_No']}" if "S_No" in row else f"ust_{row['Sıra No']}"
+                                key=f"ust_{row['Sıra No']}"
                             )
 
                             b1, b2 = st.columns(2)
